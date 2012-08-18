@@ -48,9 +48,9 @@ sudo apt-get install python-imaging
 
 Set your resolution variables and your download path (make sure it's writeable):
 '''
-DOWNLOAD_PATH = '/home/randomdrake/backgrounds/'
-RESOLUTION_X = 1680
-RESOLUTION_Y = 1050
+DOWNLOAD_PATH = '/tmp/backgrounds/'
+RESOLUTION_X = 1920
+RESOLUTION_Y = 1080
 ''' 
 
 RUN AT STARTUP
@@ -64,6 +64,7 @@ Command: python /path/to/nasa_apod_desktop.py
 Comment: Downloads the latest NASA APOD and sets it as the background.
 5) Click on the "Add" button
 '''
+import subprocess
 import commands
 import urllib
 import urllib2
@@ -75,7 +76,19 @@ from sys import exit
 
 # Configurable settings:
 NASA_APOD_SITE = 'http://apod.nasa.gov/apod/'
-SHOW_DEBUG = False
+PAPERWALL_SITE = 'http://thepaperwall.com/'
+SHOW_DEBUG = True
+
+def find_resolution():
+    p1 = subprocess.Popen(["xrandr"], stdout=subprocess.PIPE)
+    p2 = subprocess.Popen(["grep", "current"], stdin=p1.stdout, stdout=subprocess.PIPE)
+    p1.stdout.close()
+    output = p2.communicate()[0]
+
+    reg = re.search(".* current (.*?) x (.*?),.*", output)
+    RES_X = int(reg.group(1))
+    RES_Y = int(reg.group(2))
+    return RES_X, RES_Y
 
 def download_site(url):
     ''' Download HTML of the site'''
@@ -102,6 +115,46 @@ def get_image(text):
     else:
         if SHOW_DEBUG:
             print "Could not find an image. May be a video today."
+        exit()
+
+    filename = os.path.basename(file_url)
+    save_to = DOWNLOAD_PATH + os.path.splitext(filename)[0] + '.png'
+    if not os.path.isfile(save_to):
+        if SHOW_DEBUG:
+            print "Opening remote URL"
+        remote_file = urllib.urlopen(file_url)
+
+        if SHOW_DEBUG:
+            file_size = float(remote_file.headers.get("content-length"))
+            print "Retrieving image"
+            urllib.urlretrieve(file_url, save_to, print_download_status)
+
+            # Adding additional padding to ensure entire line 
+            if SHOW_DEBUG:
+                print "\rDone downloading", human_readable_size(file_size), "       "
+        else: 
+            urllib.urlretrieve(file_url, save_to)
+    elif SHOW_DEBUG:
+        print "File exists, moving on"
+
+    return save_to
+    
+def get_image_paperwall(text):
+    ''' Finds the image URL and saves it '''
+    if SHOW_DEBUG:
+        print "Grabbing the image URL"
+    reg = re.search('<img src=".*?image=/(.*?)"', text)
+    if reg:
+        if 'http' in reg.group(1):
+            # Actual url
+            file_url = reg.group(1)
+        else:
+            # Relative path, handle it
+            file_url = PAPERWALL_SITE + reg.group(1)
+    else:
+        if SHOW_DEBUG:
+            print "Could not find an image."
+            print text
         exit()
 
     filename = os.path.basename(file_url)
@@ -167,15 +220,19 @@ if __name__ == '__main__':
     ''' Our program '''
     if SHOW_DEBUG: 
         print "Starting"
+        
+    # Find desktop resolution
+    RESOLUTION_X, RESOLUTION_Y = find_resolution()
+        
     # Create the download path if it doesn't exist
     if not os.path.exists(os.path.expanduser(DOWNLOAD_PATH)):
         os.makedirs(os.path.expanduser(DOWNLOAD_PATH))
 
     # Grab the HTML contents of the file 
-    site_contents = download_site(NASA_APOD_SITE)
+    site_contents = download_site(PAPERWALL_SITE)
 
     # Download the image
-    filename = get_image(site_contents)
+    filename = get_image_paperwall(site_contents)
 
     # Resize the image
     resize_image(filename)
