@@ -48,6 +48,7 @@ sudo apt-get install python-imaging
 
 Set your resolution variables and your download path (make sure it's writeable):
 '''
+
 DOWNLOAD_PATH = '/tmp/backgrounds/'
 RESOLUTION_X = 1920
 RESOLUTION_Y = 1080
@@ -70,9 +71,12 @@ import urllib
 import urllib2
 import re
 import os
+import shutil
 from PIL import Image
 from sys import stdout
 from sys import exit
+
+HOME_DOWNLOAD_PATH = os.path.expanduser("~")+'/apod_background.png'
 
 # Configurable settings:
 NASA_APOD_SITE = 'http://apod.nasa.gov/apod/'
@@ -134,6 +138,9 @@ def get_image(text):
                 print "\rDone downloading", human_readable_size(file_size), "       "
         else: 
             urllib.urlretrieve(file_url, save_to)
+        #copy to home
+        shutil.copy(save_to, HOME_DOWNLOAD_PATH)
+        
     elif SHOW_DEBUG:
         print "File exists, moving on"
 
@@ -174,6 +181,9 @@ def get_image_paperwall(text):
                 print "\rDone downloading", human_readable_size(file_size), "       "
         else: 
             urllib.urlretrieve(file_url, save_to)
+        #copy to home
+        shutil.copy(save_to, HOME_DOWNLOAD_PATH)
+        
     elif SHOW_DEBUG:
         print "File exists, moving on"
 
@@ -228,11 +238,14 @@ if __name__ == '__main__':
     if not os.path.exists(os.path.expanduser(DOWNLOAD_PATH)):
         os.makedirs(os.path.expanduser(DOWNLOAD_PATH))
 
-    # Grab the HTML contents of the file 
-    site_contents = download_site(PAPERWALL_SITE)
+    try:
+        # Grab the HTML contents of the file
+        site_contents = download_site(PAPERWALL_SITE)
 
-    # Download the image
-    filename = get_image_paperwall(site_contents)
+        # Download the image
+        filename = get_image_paperwall(site_contents)
+    except urllib2.URLError:
+        filename = HOME_DOWNLOAD_PATH
 
     # Resize the image
     resize_image(filename)
